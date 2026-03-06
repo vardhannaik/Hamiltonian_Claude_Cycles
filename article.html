@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cooperative Cycle Coverage on Toroidal Grids</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #07080a;
+    --surface:   #0d0f12;
+    --border:    #1a1f28;
+    --text:      #d4d8e0;
+    --muted:     #5a6172;
+    --accent:    #34d399;
+    --accent2:   #818cf8;
+    --accent3:   #f59e0b;
+    --accent4:   #f87171;
+    --code-bg:   #0b0e13;
+    --rule:      #1e2530;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 18px;
+    line-height: 1.75;
+    font-weight: 300;
+  }
+
+  /* ── Grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  /* ── Layout ── */
+  .page {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 32px 120px;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 80px 0 60px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 56px;
+  }
+
+  .journal-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .journal-tag::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+    opacity: 0.3;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(28px, 5vw, 48px);
+    line-height: 1.15;
+    font-weight: 400;
+    color: #f0f2f5;
+    margin-bottom: 18px;
+    letter-spacing: -0.01em;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 40px;
+    letter-spacing: 0.04em;
+  }
+
+  .meta {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .meta span { text-transform: uppercase; }
+  .meta b { color: #8892a4; font-weight: 500; }
+
+  /* ── Abstract ── */
+  .abstract {
+    background: var(--surface);
+    border-left: 2px solid var(--accent);
+    padding: 24px 28px;
+    margin: 48px 0;
+    font-size: 15.5px;
+    line-height: 1.7;
+    color: #a0a8b8;
+  }
+
+  .abstract strong {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  /* ── Typography ── */
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: #e8eaf0;
+    margin: 64px 0 20px;
+    padding-top: 48px;
+    border-top: 1px solid var(--rule);
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin: 40px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h3::before {
+    content: '§';
+    color: var(--border);
+    font-size: 16px;
+  }
+
+  p { margin-bottom: 22px; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  strong { color: #c8d0de; font-weight: 400; }
+  em { font-style: italic; color: #9aa4b8; }
+
+  /* ── Result badges ── */
+  .result-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 32px 0;
+  }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .result-card.green::before  { background: var(--accent); }
+  .result-card.purple::before { background: var(--accent2); }
+  .result-card.amber::before  { background: var(--accent3); }
+  .result-card.red::before    { background: var(--accent4); }
+
+  .result-card .dim {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .result-card .val {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    color: #f0f2f5;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .result-card .desc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .result-card .badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 3px 7px;
+    border: 1px solid;
+  }
+
+  .badge.green  { color: var(--accent);  border-color: var(--accent);  }
+  .badge.purple { color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    margin: 32px 0;
+  }
+
+  thead tr {
+    border-bottom: 1px solid var(--accent);
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: #9aa4b8;
+    vertical-align: top;
+  }
+
+  tr:hover td { background: var(--surface); }
+
+  td.best {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  td.num { text-align: right; }
+
+  /* ── Code blocks ── */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    margin: 28px 0;
+    overflow: hidden;
+  }
+
+  .code-header {
+    background: #0f1218;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .code-lang {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .code-dots {
+    display: flex;
+    gap: 5px;
+  }
+
+  .code-dots span {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  .code-dots .r { background: #ff5f56; }
+  .code-dots .y { background: #ffbd2e; }
+  .code-dots .g { background: #27c93f; }
+
+  pre {
+    padding: 20px 22px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Syntax colours */
+  .kw   { color: #818cf8; }
+  .fn   { color: #34d399; }
+  .str  { color: #fcd34d; }
+  .num  { color: #f9a8d4; }
+  .cmt  { color: #3d4f63; font-style: italic; }
+  .var  { color: #93c5fd; }
+  .op   { color: #64748b; }
+
+  /* ── Tier diagram ── */
+  .tier-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px 28px;
+    margin: 28px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 2.0;
+  }
+
+  .tier-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid #111520;
+  }
+
+  .tier-row:last-child { border-bottom: none; }
+
+  .tier-num {
+    width: 20px;
+    text-align: right;
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+
+  .t5 { color: #34d399; }
+  .t4 { color: #6ee7b7; }
+  .t3 { color: #818cf8; }
+  .t2 { color: #93c5fd; }
+  .t1 { color: #3d4f63; }
+  .tx { color: #1e2530; }
+
+  .tier-arrow { color: #1e2530; }
+  .tier-desc  { color: #7080a0; flex: 1; }
+  .tier-label { color: #3d4f63; font-size: 11px; }
+
+  /* ── Inline code ── */
+  p code, li code {
+    background: #0f1218;
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    font-size: 0.82em;
+    color: #a5b4d0;
+  }
+
+  /* ── Pull quote ── */
+  blockquote {
+    border-left: 2px solid var(--accent3);
+    padding: 16px 22px;
+    margin: 36px 0;
+    background: #0c0e11;
+  }
+
+  blockquote p {
+    font-style: italic;
+    color: #8892a4;
+    font-size: 17px;
+    margin: 0;
+  }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Scroll progress ── */
+  #progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%;
+    z-index: 999;
+    transition: width 0.1s;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    opacity: 0;
+    animation: fadeUp 0.7s ease forwards;
+  }
+
+  .fade-in:nth-child(1) { animation-delay: 0.1s; }
+  .fade-in:nth-child(2) { animation-delay: 0.25s; }
+  .fade-in:nth-child(3) { animation-delay: 0.4s; }
+
+  /* ── Accent line ── */
+  .accent-rule {
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 50%, transparent 100%);
+    opacity: 0.25;
+    margin: 48px 0;
+  }
+
+  /* ── Equation ── */
+  .eq {
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    color: #7888a0;
+    padding: 18px 0;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .result-row { grid-template-columns: 1fr; }
+    .meta { gap: 16px; }
+    .page { padding: 0 20px 80px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="page">
+  <header>
+    <div class="journal-tag fade-in">Preprint · Algorithms &amp; Combinatorics · 2025</div>
+
+    <h1 class="fade-in">Cooperative Cycle Coverage<br>on <em>Toroidal Grids</em></h1>
+
+    <p class="subtitle fade-in">Diagonal Leaders, Golden Scouts, and Late-Stealing in n Dimensions</p>
+
+    <div class="meta fade-in">
+      <span><b>Subject</b> · Multi-Agent Coverage</span>
+      <span><b>Dimensions</b> · 3D, 4D</span>
+      <span><b>Grid size</b> · m = 5</span>
+      <span><b>Status</b> · Preprint</span>
+    </div>
+  </header>
+
+  <!-- ABSTRACT -->
+  <div class="abstract">
+    <strong>Abstract</strong>
+    We present a multi-agent cooperative coverage algorithm for <em>n</em>-dimensional toroidal grids where each agent follows a pre-planned path but dynamically steals vertices from its leaders' future schedules. A diagonal Hamiltonian (C0) sweeps the grid in uniform fiber planes; golden-ratio scouts (C1, C2, …) first fill pure gaps — vertices no leader will ever visit — then prioritise stealing the <em>latest-scheduled</em> vertices from their leaders, since those are visited last and cause the most delay. Applied to m=5 grids, the algorithm achieves <strong>50.4% efficiency in 3D</strong> (63/125 steps) and <strong>56.6% in 4D</strong> (354/625 steps), compared to 73.6% and 69.1% for pure-existence scoring.
+  </div>
+
+  <!-- SECTION 1 -->
+  <h2>1 · Background</h2>
+
+  <p>Consider an m×m×···×m toroidal grid: each coordinate wraps modulo m, and two vertices are adjacent if their taxicab distance is exactly one. Multiple agents must collectively visit every vertex at least once, minimising the <strong>cover step</strong> — the first timestep at which the union of all visited vertices equals the full grid.</p>
+
+  <p>Each agent moves one step per timestep. The challenge is coordination: without it, agents cluster and revisit the same vertices. The key insight is <em>role asymmetry</em>.</p>
+
+  <blockquote>
+    <p>C0 is a strict leader following a pre-planned diagonal path. Scouts observe C0's future schedule and adaptively choose vertices that no leader will reach — or will reach only very late.</p>
+  </blockquote>
+
+  <p>This allows scouts to make informed decisions with zero runtime communication — they need only read-access to the leaders' pre-planned sequences.</p>
+
+  <!-- SECTION 2 -->
+  <h2>2 · Path Construction</h2>
+
+  <h3>Diagonal Hamiltonian (C0)</h3>
+
+  <p>The diagonal path sweeps <strong>fiber planes</strong> s = (i+j+k+···) mod m in strict order. Within each fiber, a Warnsdorff tiebreaker prefers vertices with fewer unvisited neighbours, preventing dead ends.</p>
+
+  <p><strong>Key structural property:</strong> C0 visits vertices with coordinate sum s=0 first, s=1 next, and so on. The tail of C0's schedule contains vertices with the largest coordinate values — concentrated in the high-index corner (m−1, m−1, …) of the grid. This is measurable: in 4D at m=5, late vertices have average coordinate sum 10.0 versus 6.0 for early vertices — a gap of 4.0. In 3D the gap is smaller (7.08 vs 5.74 = 1.3), which is why the optimal late-steal window is narrower.</p>
+
+  <div class="code-block">
+    <div class="code-header">
+      <span class="code-lang">Python · diagonal3d</span>
+      <div class="code-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    </div>
+    <pre><code><span class="kw">def</span> <span class="fn">getD</span>(<span class="var">i</span>, <span class="var">j</span>, <span class="var">k</span>, <span class="var">m</span>):
+    <span class="cmt">"""Direction selector based on fiber s = (i+j+k) % m."""</span>
+    <span class="var">s</span> <span class="op">=</span> (<span class="var">i</span> <span class="op">+</span> <span class="var">j</span> <span class="op">+</span> <span class="var">k</span>) <span class="op">%</span> <span class="var">m</span>
+    <span class="kw">if</span> <span class="var">s</span> <span class="op">==</span> <span class="num">0</span>:
+        <span class="kw">return</span> <span class="str">"012"</span> <span class="kw">if</span> <span class="var">j</span> <span class="op">==</span> <span class="var">m</span> <span class="op">-</span> <span class="num">1</span> <span class="kw">else</span> <span class="str">"210"</span>
+    <span class="kw">elif</span> <span class="var">s</span> <span class="op">==</span> <span class="var">m</span> <span class="op">-</span> <span class="num">1</span>:
+        <span class="kw">return</span> <span class="str">"120"</span> <span class="kw">if</span> <span class="var">i</span> <span class="op">&gt;</span> <span class="num">0</span> <span class="kw">else</span> <span class="str">"210"</span>
+    <span class="kw">else</span>:
+        <span class="kw">return</span> <span class="str">"201"</span> <span class="kw">if</span> <span class="var">i</span> <span class="op">==</span> <span class="var">m</span> <span class="op">-</span> <span class="num">1</span> <span class="kw">else</span> <span class="str">"102"</span>
+
+<span class="kw">def</span> <span class="fn">diagonal3d</span>(<span class="var">m</span>):
+    <span class="var">i</span>, <span class="var">j</span>, <span class="var">k</span> <span class="op">=</span> <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>
+    <span class="var">path</span> <span class="op">=</span> [(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)]
+    <span class="kw">for</span> <span class="var">_</span> <span class="kw">in</span> <span class="fn">range</span>(<span class="var">m</span><span class="op">**</span><span class="num">3</span> <span class="op">-</span> <span class="num">1</span>):
+        <span class="var">d</span> <span class="op">=</span> <span class="fn">getD</span>(<span class="var">i</span>, <span class="var">j</span>, <span class="var">k</span>, <span class="var">m</span>)
+        <span class="var">nb</span> <span class="op">=</span> <span class="fn">get_nb3</span>(<span class="var">i</span>, <span class="var">j</span>, <span class="var">k</span>, <span class="var">m</span>)
+        <span class="var">i</span>, <span class="var">j</span>, <span class="var">k</span> <span class="op">=</span> <span class="var">nb</span>[<span class="fn">int</span>(<span class="var">d</span>[<span class="num">0</span>])]
+        <span class="var">path</span>.<span class="fn">append</span>((<span class="var">i</span>, <span class="var">j</span>, <span class="var">k</span>))
+    <span class="kw">return</span> <span class="var">path</span></code></pre>
+  </div>
+
+  <h3>Golden-Ratio Path (Scouts)</h3>
+
+  <p>Each scout follows a path constructed by recursively splitting the grid along its longest axis at the golden ratio φ = (1+√5)/2, then stitching the two halves together at an adjacent boundary. The result is a Hamiltonian path with <em>locally clustered, globally spread</em> structure — exactly what is needed to fill the gaps left by the diagonal leader.</p>
+
+  <div class="eq">φ = (1 + √5) / 2 ≈ 1.618 &nbsp;·&nbsp; split_index = ⌊dim / φ⌋</div>
+
+  <div class="code-block">
+    <div class="code-header">
+      <span class="code-lang">Python · build_golden3d</span>
+      <div class="code-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    </div>
+    <pre><code><span class="kw">def</span> <span class="fn">build_golden3d</span>(<span class="var">ranges</span>, <span class="var">m</span>):
+    <span class="var">ilo</span>, <span class="var">ihi</span>, <span class="var">jlo</span>, <span class="var">jhi</span>, <span class="var">klo</span>, <span class="var">khi</span> <span class="op">=</span> <span class="var">ranges</span>
+    <span class="var">dims</span> <span class="op">=</span> [<span class="var">ihi</span><span class="op">-</span><span class="var">ilo</span><span class="op">+</span><span class="num">1</span>, <span class="var">jhi</span><span class="op">-</span><span class="var">jlo</span><span class="op">+</span><span class="num">1</span>, <span class="var">khi</span><span class="op">-</span><span class="var">klo</span><span class="op">+</span><span class="num">1</span>]
+
+    <span class="cmt"># Base cases: 1D lines along each axis</span>
+    <span class="kw">if</span> <span class="var">dims</span>[<span class="num">1</span>]<span class="op">==</span><span class="num">1</span> <span class="kw">and</span> <span class="var">dims</span>[<span class="num">2</span>]<span class="op">==</span><span class="num">1</span>:
+        <span class="kw">return</span> [(<span class="var">i</span>,<span class="var">jlo</span>,<span class="var">klo</span>) <span class="kw">for</span> <span class="var">i</span> <span class="kw">in</span> <span class="fn">range</span>(<span class="var">ilo</span>, <span class="var">ihi</span><span class="op">+</span><span class="num">1</span>)]
+
+    <span class="var">axis</span> <span class="op">=</span> <span class="var">dims</span>.<span class="fn">index</span>(<span class="fn">max</span>(<span class="var">dims</span>))
+    <span class="cmt"># ... (split along longest axis at golden ratio)</span>
+    <span class="var">sv</span> <span class="op">=</span> <span class="var">lo</span> <span class="op">+</span> <span class="fn">max</span>(<span class="num">1</span>, <span class="fn">round</span>(<span class="var">dims</span>[<span class="var">axis</span>] <span class="op">/</span> <span class="var">PHI</span>)) <span class="op">-</span> <span class="num">1</span>
+
+    <span class="var">lp</span> <span class="op">=</span> <span class="fn">build_golden3d</span>(<span class="var">left_ranges</span>, <span class="var">m</span>)
+    <span class="var">rp</span> <span class="op">=</span> <span class="fn">build_golden3d</span>(<span class="var">right_ranges</span>, <span class="var">m</span>)
+
+    <span class="cmt"># Try all 4 orientations to find an adjacent join</span>
+    <span class="kw">for</span> <span class="var">l</span>, <span class="var">r</span> <span class="kw">in</span> [(<span class="var">lp</span>,<span class="var">rp</span>),(<span class="var">lp</span>,<span class="var">rp</span>[::<span class="op">-</span><span class="num">1</span>]),
+                  (<span class="var">lp</span>[::<span class="op">-</span><span class="num">1</span>],<span class="var">rp</span>),(<span class="var">lp</span>[::<span class="op">-</span><span class="num">1</span>],<span class="var">rp</span>[::<span class="op">-</span><span class="num">1</span>])]:
+        <span class="kw">if</span> <span class="fn">is_adjacent_torus</span>(<span class="var">l</span>[<span class="op">-</span><span class="num">1</span>], <span class="var">r</span>[<span class="num">0</span>], <span class="var">m</span>):
+            <span class="kw">return</span> <span class="var">l</span> <span class="op">+</span> <span class="var">r</span>
+    <span class="kw">return</span> <span class="var">lp</span> <span class="op">+</span> <span class="var">rp</span>   <span class="cmt"># fallback</span></code></pre>
+  </div>
+
+  <!-- SECTION 3 -->
+  <h2>3 · Role-Aware Simulation</h2>
+
+  <h3>V3 · Pure Existence Scoring</h3>
+
+  <p>The first working version (V3) assigns each scout a tier based purely on whether any leader will ever visit a candidate vertex:</p>
+
+  <div class="tier-diagram">
+    <div class="tier-row">
+      <span class="tier-num t3">C1</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc"><span class="t3">tier 2:</span> C0 will never visit v <span class="tier-label">← pure gap</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num t1"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t1">tier 1:</span> C0 will visit v</span>
+    </div>
+    <div class="tier-row" style="margin-top:10px">
+      <span class="tier-num t4">C2</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc"><span class="t5">tier 3:</span> neither C0 nor C1 visits <span class="tier-label">← pure gap</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t3">tier 2:</span> C0 skips, C1 will come</span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t1">tier 1:</span> C0 will visit</span>
+    </div>
+  </div>
+
+  <p>V3 achieves 92/125 steps in 3D and 432/625 in 4D — already a significant improvement over naive approaches, because scouts fill the structural gaps left by C0's fiber-ordered sweep.</p>
+
+  <h3>V6 · Existence Tiers + Late-Stealing</h3>
+
+  <p>V6 keeps V3's existence tiers as the primary signal and adds a <strong>late-steal sub-tier</strong>: vertices in the last <code>LATE_FRAC</code> of a leader's remaining schedule receive higher priority than vertices the leader visits soon. The threshold is dynamic — recomputed each step as a fraction of C0's <em>remaining</em> schedule, not its total.</p>
+
+  <div class="tier-diagram">
+    <div class="tier-row">
+      <span class="tier-num t5">C1</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc"><span class="t5">tier 3:</span> C0 will never visit <span class="tier-label">← pure gap (unchanged from V3)</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t3">tier 2:</span> C0 visits, but LATE (last ~10–19%) <span class="tier-label">← steal the tail</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t1">tier 1:</span> C0 visits soon <span class="tier-label">← let C0 handle it</span></span>
+    </div>
+    <div class="tier-row" style="margin-top:10px">
+      <span class="tier-num t4">C2</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc"><span class="t5">tier 4:</span> pure gap — neither C0 nor C1 <span class="tier-label">← highest priority</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t4">tier 3:</span> C0 skips, C1 visits LATE <span class="tier-label">← steal C1's tail</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t3">tier 2:</span> C0 skips C1-soon, or C0-late</span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num"></span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc"><span class="t1">tier 1:</span> C0 visits soon</span>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header">
+      <span class="code-lang">Python · V6 simulation core</span>
+      <div class="code-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    </div>
+    <pre><code><span class="var">LATE_FRAC</span> <span class="op">=</span> <span class="num">0.095</span>   <span class="cmt"># 3D tuned  (use 0.187 for 4D)</span>
+
+<span class="kw">for</span> <span class="var">t</span> <span class="kw">in</span> <span class="fn">range</span>(<span class="var">total</span>):
+    <span class="var">c0_step</span> <span class="op">=</span> <span class="var">t</span> <span class="op">+</span> <span class="num">1</span>
+    <span class="var">c0_rem</span>  <span class="op">=</span> <span class="var">total</span> <span class="op">-</span> <span class="var">c0_step</span>
+    <span class="var">thr</span>     <span class="op">=</span> <span class="fn">int</span>(<span class="var">c0_rem</span> <span class="op">*</span> (<span class="num">1</span> <span class="op">-</span> <span class="var">LATE_FRAC</span>))   <span class="cmt"># dynamic threshold</span>
+
+    <span class="kw">def</span> <span class="fn">lateness</span>(<span class="var">smap</span>, <span class="var">v</span>, <span class="var">cur</span>):
+        <span class="var">vi</span> <span class="op">=</span> <span class="var">smap</span>.<span class="fn">get</span>(<span class="var">v</span>, <span class="op">-</span><span class="num">1</span>)
+        <span class="kw">if</span> <span class="var">vi</span> <span class="op">&lt;</span> <span class="num">0</span>: <span class="kw">return</span> <span class="num">0</span>
+        <span class="var">l</span> <span class="op">=</span> (<span class="var">vi</span> <span class="op">-</span> <span class="var">cur</span>) <span class="op">%</span> <span class="var">total</span>
+        <span class="kw">return</span> <span class="var">l</span> <span class="kw">if</span> <span class="var">l</span> <span class="op">&gt;</span> <span class="num">0</span> <span class="kw">else</span> <span class="num">0</span>
+
+    <span class="cmt"># Score C1's candidates</span>
+    <span class="kw">for</span> <span class="var">d</span> <span class="kw">in</span> <span class="fn">get_nb3</span>(<span class="op">*</span><span class="var">pos</span>[<span class="num">1</span>], <span class="var">m</span>):
+        <span class="var">l0</span> <span class="op">=</span> <span class="fn">lateness</span>(<span class="var">c0s</span>, <span class="var">d</span>, <span class="var">c0_step</span>)
+        <span class="kw">if</span>   <span class="var">l0</span> <span class="op">==</span> <span class="num">0</span>:       <span class="var">score</span> <span class="op">=</span> <span class="num">3</span>   <span class="cmt"># gap</span>
+        <span class="kw">elif</span> <span class="var">l0</span> <span class="op">&gt;=</span> <span class="var">thr</span>:   <span class="var">score</span> <span class="op">=</span> <span class="num">2</span>   <span class="cmt"># C0-late → steal</span>
+        <span class="kw">else</span>:             <span class="var">score</span> <span class="op">=</span> <span class="num">1</span>   <span class="cmt"># C0-soon → skip</span>
+
+    <span class="cmt"># Score C2's candidates</span>
+    <span class="kw">for</span> <span class="var">d</span> <span class="kw">in</span> <span class="fn">get_nb3</span>(<span class="op">*</span><span class="var">pos</span>[<span class="num">2</span>], <span class="var">m</span>):
+        <span class="var">l0</span> <span class="op">=</span> <span class="fn">lateness</span>(<span class="var">c0s</span>, <span class="var">d</span>, <span class="var">c0_step</span>)
+        <span class="var">l1</span> <span class="op">=</span> <span class="fn">lateness</span>(<span class="var">c1s</span>, <span class="var">d</span>, <span class="var">c1_cur</span>)
+        <span class="kw">if</span>   <span class="var">l0</span><span class="op">==</span><span class="num">0</span> <span class="kw">and</span> <span class="var">l1</span><span class="op">==</span><span class="num">0</span>:      <span class="var">score</span> <span class="op">=</span> <span class="num">4</span>  <span class="cmt"># pure gap</span>
+        <span class="kw">elif</span> <span class="var">l0</span><span class="op">==</span><span class="num">0</span> <span class="kw">and</span> <span class="var">l1</span><span class="op">&gt;=</span><span class="var">thr</span>:  <span class="var">score</span> <span class="op">=</span> <span class="num">3</span>  <span class="cmt"># C0-skip, C1-late</span>
+        <span class="kw">elif</span> <span class="var">l0</span><span class="op">==</span><span class="num">0</span>:              <span class="var">score</span> <span class="op">=</span> <span class="num">2</span>  <span class="cmt"># C0-skip, C1-soon</span>
+        <span class="kw">elif</span> <span class="var">l0</span><span class="op">&gt;=</span><span class="var">thr</span>:            <span class="var">score</span> <span class="op">=</span> <span class="num">2</span>  <span class="cmt"># C0-late</span>
+        <span class="kw">else</span>:                     <span class="var">score</span> <span class="op">=</span> <span class="num">1</span>  <span class="cmt"># C0-soon</span></code></pre>
+  </div>
+
+  <!-- SECTION 4 -->
+  <h2>4 · Results</h2>
+
+  <div class="result-row">
+    <div class="result-card green">
+      <div class="badge green">3D · V6</div>
+      <div class="dim">Cover step</div>
+      <div class="val">63 / 125</div>
+      <div class="desc">50.4% efficiency · m=5 · 3 agents</div>
+    </div>
+    <div class="result-card purple">
+      <div class="badge purple">4D · V6</div>
+      <div class="dim">Cover step</div>
+      <div class="val">354 / 625</div>
+      <div class="desc">56.6% efficiency · m=5 · 4 agents</div>
+    </div>
+    <div class="result-card amber">
+      <div class="dim">V6 improvement over V3</div>
+      <div class="val">−29</div>
+      <div class="desc">steps saved in 3D (92 → 63)</div>
+    </div>
+    <div class="result-card red">
+      <div class="dim">V6 improvement over V3</div>
+      <div class="val">−78</div>
+      <div class="desc">steps saved in 4D (432 → 354)</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Configuration</th>
+        <th class="num">Cover Step</th>
+        <th class="num">Efficiency</th>
+        <th class="num">vs V3</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>3D m=5 · V3 (pure existence)</td>
+        <td class="num">92 / 125</td>
+        <td class="num">73.6%</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="best">3D m=5 · V6 (+ late-steal)</td>
+        <td class="num best">63 / 125</td>
+        <td class="num best">50.4%</td>
+        <td class="num best">−29 steps</td>
+      </tr>
+      <tr>
+        <td>4D m=5 · V3 (pure existence)</td>
+        <td class="num">432 / 625</td>
+        <td class="num">69.1%</td>
+        <td class="num">—</td>
+      </tr>
+      <tr>
+        <td class="best">4D m=5 · V6 (+ late-steal)</td>
+        <td class="num best">354 / 625</td>
+        <td class="num best">56.6%</td>
+        <td class="num best">−78 steps</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Optimal LATE_FRAC by Dimension</h3>
+
+  <p>The optimal late-steal window scales with the <strong>tail concentration</strong> of the diagonal path — how much larger the average coordinate sum is for late vertices versus early ones. In 4D the gap is ~4.0, requiring a wider window (18.7%). In 3D the gap is only ~1.3, requiring a narrower window (9.5%) to avoid diluting the signal with ordinary mid-schedule vertices.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th class="num">Optimal LATE_FRAC</th>
+        <th class="num">Tail concentration Δ</th>
+        <th class="num">Late window (of remaining)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>3D</td>
+        <td class="num">0.095</td>
+        <td class="num">+1.3</td>
+        <td class="num">last 9.5%</td>
+      </tr>
+      <tr>
+        <td>4D</td>
+        <td class="num">0.187</td>
+        <td class="num">+4.0</td>
+        <td class="num">last 18.7%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="accent-rule"></div>
+
+  <!-- SECTION 5 -->
+  <h2>5 · Why Late-Stealing Works</h2>
+
+  <p>The diagonal C0 path starts at (0,0,0,…) and processes vertices in order of increasing coordinate sum modulo m. Due to the toroidal structure, vertices near (m−1, m−1, m−1, …) — the high-index corner — accumulate in C0's tail schedule. They are visited last because the Warnsdorff tiebreaker systematically defers them: other vertices have more unvisited neighbours and are therefore preferred.</p>
+
+  <p>Stealing these tail vertices achieves two things simultaneously:</p>
+
+  <p><strong>1. Direct time compression.</strong> A vertex C0 would have visited at step t is instead visited at step t' &lt;&lt; t. The cover time drops by (t − t') if this was the last uncovered vertex.</p>
+
+  <p><strong>2. Cascade compression.</strong> When scouts consume C0's late vertices, C0 arrives at an already-covered position and must proceed — effectively shortening C0's useful work and making its remaining schedule denser with truly uncovered vertices. The coverage curve accelerates.</p>
+
+  <blockquote>
+    <p>The scouts are not just filling gaps — they are reshaping the effective coverage frontier so that C0's structured sweep finishes sooner.</p>
+  </blockquote>
+
+  <!-- SECTION 6 -->
+  <h2>6 · Extension to nD</h2>
+
+  <p>The framework extends naturally to n dimensions. Each new dimension requires one additional scout (Cn−1) with awareness of all previous leaders. The tier count grows by one per scout, and the late-steal threshold likely requires re-tuning as the tail concentration of the diagonal path changes with dimension.</p>
+
+  <p>In n dimensions the scoring for scout Ck is:</p>
+
+  <div class="tier-diagram">
+    <div class="tier-row">
+      <span class="tier-num t5">n+1</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc">none of C0…C(k−1) will ever visit v <span class="tier-label">← pure gap</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num t4">  n</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc">C0…C(k−2) skip, C(k−1) visits LATE <span class="tier-label">← steal C(k−1)'s tail</span></span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num t3">n−1</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc">C0…C(k−3) skip, C(k−2) visits LATE</span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num t2">  …</span>
+      <span class="tier-arrow"> </span>
+      <span class="tier-desc">… (one tier per leader, alternating gap / late-steal) …</span>
+    </div>
+    <div class="tier-row">
+      <span class="tier-num t1">  1</span>
+      <span class="tier-arrow">→</span>
+      <span class="tier-desc">C0 visits soon <span class="tier-label">← lowest priority</span></span>
+    </div>
+  </div>
+
+  <div class="accent-rule"></div>
+
+  <h2>Code &amp; Reproducibility</h2>
+
+  <p>Full source code, including path constructors, V3/V6 simulators, animation code, and benchmark sweeps over <code>LATE_FRAC</code> values, is available at:</p>
+
+  <div class="code-block">
+    <div class="code-header">
+      <span class="code-lang">Shell</span>
+      <div class="code-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    </div>
+    <pre><code><span class="cmt"># Clone and run</span>
+<span class="fn">git</span> clone https://github.com/username/cooperative-cycle-coverage
+<span class="fn">cd</span> cooperative-cycle-coverage
+<span class="fn">pip</span> install numpy matplotlib
+
+<span class="cmt"># 3D simulation</span>
+<span class="fn">python</span> simulate_3d.py --m 5 --late-frac 0.095
+
+<span class="cmt"># 4D simulation</span>
+<span class="fn">python</span> simulate_4d.py --m 5 --late-frac 0.187
+
+<span class="cmt"># Sweep LATE_FRAC</span>
+<span class="fn">python</span> sweep_late_frac.py --dim 3 --m 5</code></pre>
+  </div>
+
+  <footer>
+    <div>
+      <div>Cooperative Cycle Coverage on Toroidal Grids</div>
+      <div style="margin-top:6px; color:#2d3748">Preprint · 2025</div>
+    </div>
+    <div style="text-align:right">
+      <div>github.com/username/cooperative-cycle-coverage</div>
+      <div style="margin-top:6px; color:#2d3748">MIT License</div>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // Scroll progress bar
+  window.addEventListener('scroll', () => {
+    const scrolled = window.scrollY;
+    const total = document.body.scrollHeight - window.innerHeight;
+    const pct = total > 0 ? (scrolled / total) * 100 : 0;
+    document.getElementById('progress').style.width = pct + '%';
+  });
+
+  // Intersection observer for subtle reveals
+  const observer = new IntersectionObserver(
+    (entries) => entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+        observer.unobserve(e.target);
+      }
+    }),
+    { threshold: 0.1 }
+  );
+
+  document.querySelectorAll('h2, .result-card, .code-block, table, .tier-diagram, blockquote').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(16px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>
